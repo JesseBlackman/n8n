@@ -196,6 +196,9 @@ export class WorkflowRunner {
 			const postExecutePromise = this.activeExecutions.getPostExecutePromise(executionId);
 			postExecutePromise
 				.then(async (executionData) => {
+					this.logger.info(
+						`ExecutionId: ${executionId} postExecutePromise: ${JSON.stringify(executionData)}`,
+					);
 					void Container.get(InternalHooks).onWorkflowPostExecute(
 						executionId,
 						data.workflowData,
@@ -213,6 +216,11 @@ export class WorkflowRunner {
 							ErrorReporter.error(error);
 							console.error('There was a problem running hook "workflow.postExecute"', error);
 						}
+					}
+					//check if lastNodeExecuted is Donkey Node
+					if ('Donkey Node' == executionData?.data.resultData.lastNodeExecuted) {
+						await this.executionRepository.deleteByIds([executionId]);
+						this.logger.info(`ExecutionId: ${executionId} end with Donkey Node, so delete it!`);
 					}
 				})
 				.catch((error) => {
@@ -352,7 +360,10 @@ export class WorkflowRunner {
 			}
 
 			workflowExecution
-				.then((fullRunData) => {
+				.then(async (fullRunData) => {
+					// this.logger.info(
+					// 	`Execution ID ${executionId} FullRunData: ${JSON.stringify(fullRunData)}`,
+					// );
 					clearTimeout(executionTimeout);
 					if (workflowExecution.isCanceled) {
 						fullRunData.finished = false;
